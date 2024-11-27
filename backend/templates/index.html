@@ -1,0 +1,33 @@
+<!-- index.html -->
+
+<!DOCTYPE html>
+<html>
+<head>
+    <title>ECG Real-time Monitoring</title>
+    <!-- 引入 Socket.IO 库 -->
+    <script src="https://cdn.socket.io/4.4.1/socket.io.min.js"></script>
+    <!-- 引入 Plotly.js 库 -->
+    <script src="https://cdn.plot.ly/plotly-latest.min.js"></script>
+</head>
+<body>
+<h1>实时ECG监测</h1>
+<select id="ecgFiles">
+
+</select>
+<button onclick="startECG()">开始检测</button>
+<button onclick="stopECG()">停止检测</button>
+<button onclick="triggerAnalysis()">ECG波形特征分析</button>
+<button onclick="HRVAnalysis()">HRV分析</button>
+<button onclick="EDRAnalysis()">ECG衍生呼吸</button>
+
+<div id="ecg_plots" style="width:100%;height:600px;"></div>
+<div id="analysis_results"></div>
+<div id="result">
+    <img id="ecgImage" src="" alt="ECG Image" style="display: none;"/>
+</div>
+
+
+<!-- 引用静态文件 -->
+<script src="{{ url_for('static', filename='ecg.js') }}"></script>
+</body>
+</html>
