@@ -1,9 +1,9 @@
 # ecg_monitoring_system.py
 
 import time
-from ecg_data_processor import ECGDataProcessor
-from serial_reader import SerialPortReader
-from data_storage import DataStorage  # 导入DataStorage
+from .ecg_data_processor import ECGDataProcessor
+from .serial_reader import SerialPortReader
+from .data_storage import DataStorage  # 导入DataStorage
 import numpy as np  # 导入 NumPy
 
 class ECGMonitoringSystem:

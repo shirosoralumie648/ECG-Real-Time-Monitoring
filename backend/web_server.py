@@ -5,8 +5,8 @@ import numpy as np
 from matplotlib import pyplot as plt
 
 
-from backend.ecg_data_processor import ECGDataProcessor
-from backend.ecg_signal_analyzer import ECGSignalAnalyzer
+from .ecg_data_processor import ECGDataProcessor
+from .ecg_signal_analyzer import ECGSignalAnalyzer
 
 eventlet.monkey_patch()
 
@@ -23,7 +23,7 @@ app.config['SECRET_KEY'] = 'secret!'
 socketio = SocketIO(app, cors_allowed_origins='*', async_mode='eventlet', ping_timeout=20, ping_interval=10)
 
 
-from ecg_monitoring_system import ECGMonitoringSystem
+from .ecg_monitoring_system import ECGMonitoringSystem
 
 ecg_system = ECGMonitoringSystem(socketio)
 

@@ -1,0 +1,28 @@
+/* style.css */
+
+body {
+    padding-bottom: 60px; /* Add padding for the footer */
+}
+
+.plotly-chart-container {
+    width: 100%;
+    min-height: 500px; /* Ensure the plot area has a decent height */
+    height: 60vh; /* Adjust height based on viewport */
+}
+
+.card-header {
+    font-weight: bold;
+}
+
+footer {
+    position: fixed;
+    bottom: 0;
+    width: 100%;
+    background-color: #f8f9fa; /* Match Bootstrap light background */
+}
+
+/* Ensure dropdown works correctly */
+.input-group .dropdown-toggle {
+    border-top-left-radius: 0;
+    border-bottom-left-radius: 0;
+}

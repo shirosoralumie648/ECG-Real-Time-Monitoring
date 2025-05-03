@@ -1,33 +1,81 @@
-<!-- index.html -->
-
 <!DOCTYPE html>
-<html>
+<html lang="zh-CN">
 <head>
-    <title>ECG Real-time Monitoring</title>
-    <!-- 引入 Socket.IO 库 -->
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>ECG 实时监测系统</title>
+    <!-- Bootstrap CSS -->
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+    <!-- Custom CSS -->
+    <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
+    <!-- Socket.IO -->
     <script src="https://cdn.socket.io/4.4.1/socket.io.min.js"></script>
-    <!-- 引入 Plotly.js 库 -->
+    <!-- Plotly.js -->
     <script src="https://cdn.plot.ly/plotly-latest.min.js"></script>
 </head>
 <body>
-<h1>实时ECG监测</h1>
-<select id="ecgFiles">
 
-</select>
-<button onclick="startECG()">开始检测</button>
-<button onclick="stopECG()">停止检测</button>
-<button onclick="triggerAnalysis()">ECG波形特征分析</button>
-<button onclick="HRVAnalysis()">HRV分析</button>
-<button onclick="EDRAnalysis()">ECG衍生呼吸</button>
+<nav class="navbar navbar-expand-lg navbar-dark bg-dark">
+    <div class="container-fluid">
+        <a class="navbar-brand" href="#">ECG 监测系统</a>
+    </div>
+</nav>
 
-<div id="ecg_plots" style="width:100%;height:600px;"></div>
-<div id="analysis_results"></div>
-<div id="result">
-    <img id="ecgImage" src="" alt="ECG Image" style="display: none;"/>
+<div class="container mt-4">
+    <div class="row mb-3 gy-3">
+        <div class="col-md-6">
+            <h5>控制面板</h5>
+            <div class="d-flex flex-wrap gap-2">
+                <button class="btn btn-success" onclick="startECG()">开始实时监测</button>
+                <button class="btn btn-danger" onclick="stopECG()">停止实时监测</button>
+            </div>
+        </div>
+        <div class="col-md-6">
+            <h5>历史数据分析</h5>
+            <div class="input-group">
+                <select class="form-select" id="ecgFiles">
+                    <option selected>选择一个历史文件...</option>
+                </select>
+                <button class="btn btn-outline-secondary dropdown-toggle" type="button" data-bs-toggle="dropdown" aria-expanded="false">选择分析</button>
+                <ul class="dropdown-menu dropdown-menu-end">
+                  <li><a class="dropdown-item" href="#" onclick="triggerAnalysis(); return false;">ECG特征</a></li>
+                  <li><a class="dropdown-item" href="#" onclick="HRVAnalysis(); return false;">HRV分析</a></li>
+                  <li><a class="dropdown-item" href="#" onclick="EDRAnalysis(); return false;">ECG衍生呼吸</a></li>
+                </ul>
+            </div>
+        </div>
+    </div>
+
+    <div class="card mb-4">
+        <div class="card-header">
+            实时 ECG 信号 (12 导联)
+        </div>
+        <div class="card-body">
+            <div id="ecg_plots" class="plotly-chart-container"></div>
+        </div>
+    </div>
+
+    <div class="card">
+        <div class="card-header">
+            分析结果
+        </div>
+        <div class="card-body">
+            <div id="analysis_results" class="text-center">请先选择历史文件并点击分析按钮</div>
+            <div id="result" class="text-center mt-3">
+                <img id="ecgImage" src="" alt="分析图像" class="img-fluid" style="display: none; max-width: 100%; height: auto;"/>
+            </div>
+        </div>
+    </div>
+
 </div>
 
+<footer class="text-center mt-4 py-3 bg-light">
+    <p>&copy; 2025 ECG 监测系统</p>
+</footer>
 
-<!-- 引用静态文件 -->
+<!-- Bootstrap JS Bundle -->
+<script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+<!-- Custom JS -->
 <script src="{{ url_for('static', filename='ecg.js') }}"></script>
 </body>
 </html>
