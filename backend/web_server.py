@@ -7,6 +7,8 @@ from matplotlib import pyplot as plt
 
 from .ecg_data_processor import ECGDataProcessor
 from .ecg_signal_analyzer import ECGSignalAnalyzer
+from .respiration_processor import RespirationProcessor
+from .respiration_monitoring_system import RespirationMonitoringSystem
 
 eventlet.monkey_patch()
 
@@ -26,6 +28,8 @@ socketio = SocketIO(app, cors_allowed_origins='*', async_mode='eventlet', ping_t
 from .ecg_monitoring_system import ECGMonitoringSystem
 
 ecg_system = ECGMonitoringSystem(socketio)
+# 初始化呼吸监测系统，设置UDP接收端口为1347
+respiration_system = RespirationMonitoringSystem(socketio, host='127.0.0.1', port=1347)
 
 
 FILE_DIRECTORY = '.'
@@ -143,12 +147,16 @@ def index():
 def start():
     print("Received /start request")
     ecg_system.start()
+    # 同时启动呼吸监测系统
+    respiration_system.start()
     return jsonify({'status': 'started'}), 200
 
 @app.route('/stop', methods=['POST'])
 def stop():
     print("Received /stop request")
     ecg_system.stop()
+    # 同时停止呼吸监测系统
+    respiration_system.stop()
     return jsonify({'status': 'stopped'})
 
 @app.route('/analyze', methods=['POST'])
@@ -167,6 +175,10 @@ def analyze():
     elif analysis_type == 'clinical_indices':
         clinical_indices = ecg_system.data_processor.calculate_clinical_indices(ecg_signal)
         result = generate_clinical_indices_result(clinical_indices)
+    elif analysis_type == 'respiration_rate':  # 添加呼吸频率分析
+        respiration_signal = respiration_system.accumulated_data
+        respiration_rate = respiration_processor.calculate_respiration_rate(respiration_signal)
+        result = str(respiration_rate)
     else:
         result = '未知的分析类型'
     return jsonify({'result': result})
