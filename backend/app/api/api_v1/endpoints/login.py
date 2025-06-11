@@ -5,7 +5,9 @@ from fastapi import APIRouter, Depends, HTTPException
 from fastapi.security import OAuth2PasswordRequestForm
 from sqlalchemy.orm import Session
 
-from backend.app import crud, models, schemas
+from backend.app import crud
+from backend.app.models import user as user_model
+from backend.app.schemas import token as token_schema, user as user_schema
 from backend.app.api import deps
 from backend.app.core import security
 from backend.app.core.config import settings
@@ -13,7 +15,7 @@ from backend.app.core.config import settings
 router = APIRouter()
 
 
-@router.post("/login/access-token", response_model=schemas.Token)
+@router.post("/login/access-token", response_model=token_schema.Token)
 def login_access_token(
     db: Session = Depends(deps.get_db),
     form_data: OAuth2PasswordRequestForm = Depends()
@@ -37,9 +39,9 @@ def login_access_token(
     }
 
 
-@router.post("/login/test-token", response_model=schemas.User)
+@router.post("/login/test-token", response_model=user_schema.User)
 def test_token(
-    current_user: models.User = Depends(deps.get_current_user)
+    current_user: user_model.User = Depends(deps.get_current_user)
 ) -> Any:
     """
     Test access token

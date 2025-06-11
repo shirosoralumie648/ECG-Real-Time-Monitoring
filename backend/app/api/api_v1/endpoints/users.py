@@ -3,17 +3,18 @@ from typing import Any, List
 from fastapi import APIRouter, Body, Depends, HTTPException
 from sqlalchemy.orm import Session
 
-from backend.app import crud, models, schemas
+from backend.app import crud, models
+from backend.app.schemas import user as user_schema
 from backend.app.api import deps
 
 router = APIRouter()
 
 
-@router.post("/", response_model=schemas.User)
+@router.post("/", response_model=user_schema.User)
 def create_user(
     *, 
     db: Session = Depends(deps.get_db), 
-    user_in: schemas.UserCreate
+    user_in: user_schema.UserCreate
 ) -> Any:
     """
     Create new user.
