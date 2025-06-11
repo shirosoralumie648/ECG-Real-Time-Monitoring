@@ -12,3 +12,4 @@ python-multipart
 influxdb-client
 celery
 redis
+websockets

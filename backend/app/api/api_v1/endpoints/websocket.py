@@ -1,53 +1,76 @@
 from fastapi import APIRouter, WebSocket, WebSocketDisconnect
+import json
 import asyncio
+from typing import List
 
 router = APIRouter()
 
 class ConnectionManager:
     def __init__(self):
-        self.active_connections: list[WebSocket] = []
+        self.clients: List[WebSocket] = []
+        self.data_source: WebSocket | None = None
 
     async def connect(self, websocket: WebSocket):
         await websocket.accept()
-        self.active_connections.append(websocket)
 
     def disconnect(self, websocket: WebSocket):
-        self.active_connections.remove(websocket)
+        if websocket in self.clients:
+            self.clients.remove(websocket)
+            print(f"Client disconnected. Total clients: {len(self.clients)}")
+        if self.data_source == websocket:
+            self.data_source = None
+            print("Data source disconnected.")
 
-    async def broadcast(self, message: str):
-        for connection in self.active_connections:
-            await connection.send_text(message)
+    async def broadcast_to_clients(self, message: str):
+        if self.clients:
+            tasks = [client.send_text(message) for client in self.clients]
+            await asyncio.gather(*tasks, return_exceptions=True)
 
 manager = ConnectionManager()
-
-import random
-import json
-
-# ... (rest of the ConnectionManager class)
 
 @router.websocket("/ws")
 async def websocket_endpoint(websocket: WebSocket):
     await manager.connect(websocket)
     try:
-        # Start a background task to broadcast data
-        async def data_sender():
+        # Wait for an identification message for a short period.
+        first_message = await asyncio.wait_for(websocket.receive_text(), timeout=1.0)
+        message_data = json.loads(first_message)
+
+        if message_data.get("type") == "data_source":
+            # This is the data source connection
+            if manager.data_source is not None:
+                print("A data source is already connected. Rejecting new connection.")
+                await websocket.close(code=1008, reason="Data source already connected")
+                return
+
+            manager.data_source = websocket
+            print("Data source connected.")
+            try:
+                # Loop to receive data from the source and broadcast it
+                while True:
+                    data = await websocket.receive_text()
+                    await manager.broadcast_to_clients(data)
+            finally:
+                manager.disconnect(websocket)
+        else:
+            # Message received, but not a valid data_source identifier
+            await websocket.close(code=1002, reason="Invalid identification message")
+
+    except asyncio.TimeoutError:
+        # No message received within timeout, so it's a client.
+        manager.clients.append(websocket)
+        print(f"Client connected. Total clients: {len(manager.clients)}")
+        try:
+            # Keep the connection open to receive broadcasts. The loop will exit on disconnect.
             while True:
-                await asyncio.sleep(0.1) # Broadcast every 100ms
-                data_point = {
-                    "timestamp": asyncio.get_event_loop().time(),
-                    "value": random.uniform(-0.5, 1.5) # Simulate ECG signal
-                }
-                await manager.broadcast(json.dumps(data_point))
-        
-        sender_task = asyncio.create_task(data_sender())
+                await websocket.receive_text() # This just waits for a message to detect disconnect
+        finally:
+            manager.disconnect(websocket)
 
-        while True:
-            # Keep the connection alive by waiting for messages (or just sleeping)
-            # This part can be used to receive commands from the client in the future
-            await websocket.receive_text() # This will block until a message is received
-
-    except WebSocketDisconnect:
+    except (json.JSONDecodeError, WebSocketDisconnect):
+        # Disconnect if the first message isn't valid JSON or if a disconnect occurs.
         manager.disconnect(websocket)
-        if 'sender_task' in locals() and not sender_task.done():
-            sender_task.cancel()
+    except Exception as e:
+        print(f"An unexpected error occurred: {e}")
+        manager.disconnect(websocket)
 
