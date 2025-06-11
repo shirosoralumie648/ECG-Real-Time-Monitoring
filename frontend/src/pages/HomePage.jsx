@@ -16,6 +16,7 @@ const HomePage = () => {
   const [isConnected, setIsConnected] = useState(false);
   const [error, setError] = useState(null);
   const [selectedFile, setSelectedFile] = useState(null);
+  const [isScanning, setIsScanning] = useState(false);
 
   const handleConnect = async () => {
     setIsConnecting(true);
@@ -37,25 +38,41 @@ const HomePage = () => {
         fetchOptions.body = formData;
         statusMessage = `Playing back from ${selectedFile.name}`;
       } else { // serial or udp
-        const body = { type: dataSource };
+        const formData = new FormData();
+        formData.append('type', dataSource);
         if (dataSource === 'serial') {
           if (!selectedPort) throw new Error('No serial port selected');
-          body.port = selectedPort;
+          formData.append('port', selectedPort);
           statusMessage = `Connected to ${selectedPort}`;
         } else if (dataSource === 'udp') {
-          body.host = udpHost;
-          body.port = udpPort;
+          formData.append('host', udpHost);
+          formData.append('port', udpPort);
           statusMessage = `Connected to UDP ${udpHost}:${udpPort}`;
         }
-        fetchOptions.headers = { 'Content-Type': 'application/json' };
-        fetchOptions.body = JSON.stringify(body);
+        fetchOptions.body = formData;
+        // For FormData, browser sets Content-Type automatically
       }
 
       const response = await fetch('/api/v1/ports/connect', fetchOptions);
 
       if (!response.ok) {
-        const errorData = await response.json().catch(() => ({ detail: 'Failed to connect' }));
-        throw new Error(errorData.detail || 'Failed to connect');
+        const errorData = await response.json().catch(() => ({ detail: 'Failed to connect (non-JSON response)' }));
+        let errorMessage = 'Failed to connect';
+        if (errorData && errorData.detail) {
+          if (typeof errorData.detail === 'string') {
+            errorMessage = errorData.detail;
+          } else if (Array.isArray(errorData.detail)) {
+            // FastAPI validation errors
+            errorMessage = errorData.detail.map(err => `${err.loc.join(' -> ')}: ${err.msg}`).join(', ');
+          } else if (typeof errorData.detail === 'object') {
+            errorMessage = JSON.stringify(errorData.detail);
+          } else {
+            errorMessage = String(errorData.detail);
+          }
+        } else if (response.statusText) {
+            errorMessage = response.statusText;
+        }
+        throw new Error(errorMessage);
       }
 
       const data = await response.json();
@@ -63,10 +80,9 @@ const HomePage = () => {
       setIsConnected(true);
       console.log(data.message);
     } catch (error) {
-      console.error(error);
-      const errorMessage = error.message || 'An unknown error occurred.';
+      console.error('Connection error details:', error); // Log the full error object
       setConnectionStatus(`Connection Failed`);
-      setError(errorMessage);
+      setError(error.message || 'An unknown error occurred during connection.');
       setIsConnected(false);
     } finally {
       setIsConnecting(false);
@@ -97,25 +113,35 @@ const HomePage = () => {
   };
 
 
-  const fetchSerialPorts = async () => {
+  const handleScanPorts = async () => {
+    setIsScanning(true);
+    setError(null);
     try {
       const response = await fetch('/api/v1/ports/scan');
       if (!response.ok) {
-        throw new Error('Failed to fetch serial ports');
+        const errorText = await response.text();
+        throw new Error(errorText || 'Failed to fetch serial ports');
       }
       const data = await response.json();
       setSerialPorts(data.ports || []);
       if (data.ports && data.ports.length > 0) {
         setSelectedPort(data.ports[0]);
+      } else {
+        console.log('No serial ports found.');
+        setSelectedPort(''); // Reset selection if no ports are found
       }
     } catch (error) {
-      console.error(error);
-      // Handle error display to user
+      console.error('Scan error:', error);
+      setError(`Scan failed: ${error.message}`);
+      setSerialPorts([]); // Clear ports on error
+    } finally {
+      setIsScanning(false);
     }
   };
 
   useEffect(() => {
     if (dataSource === 'serial') {
+      handleScanPorts();
       fetchSerialPorts();
     }
   }, [dataSource]);
@@ -304,7 +330,9 @@ const HomePage = () => {
                 ))}
               </Select>
             </FormControl>
-            <Button onClick={fetchSerialPorts} disabled={isConnecting || isConnected}>Scan</Button>
+            <Button onClick={handleScanPorts} disabled={isConnecting || isConnected || isScanning}>
+              {isScanning ? <CircularProgress size={24} /> : 'Scan'}
+            </Button>
           </Box>
         )}
 
