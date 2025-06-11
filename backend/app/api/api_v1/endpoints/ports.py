@@ -17,6 +17,7 @@ def scan_ports():
 @router.post("/connect")
 async def connect(
     type: str = Form(...),
+    dataFormat: str = Form(...), # Added dataFormat parameter
     port: Optional[str] = Form(None),
     host: Optional[str] = Form(None),
     file: Optional[UploadFile] = File(None)
@@ -30,14 +31,14 @@ async def connect(
     if type == "serial":
         if not port:
             raise HTTPException(status_code=400, detail="Port is required for serial connection")
-        connection_manager["connection"] = {"port": port}
+        connection_manager["connection"] = {"port": port, "dataFormat": dataFormat}
         connection_manager["type"] = "serial"
         return {"message": f"Connected to serial port {port}"}
 
     elif type == "udp":
         if not host or not port:
             raise HTTPException(status_code=400, detail="Host and port are required for UDP")
-        connection_manager["connection"] = {"host": host, "port": port}
+        connection_manager["connection"] = {"host": host, "port": port, "dataFormat": dataFormat}
         connection_manager["type"] = "udp"
         return {"message": f"Connected to UDP {host}:{port}"}
 
@@ -46,7 +47,7 @@ async def connect(
             raise HTTPException(status_code=400, detail="File is required for file playback")
         # In a real app, you would save the file and start a playback thread
         # For now, just acknowledge the file
-        connection_manager["connection"] = {"filename": file.filename}
+        connection_manager["connection"] = {"filename": file.filename, "dataFormat": dataFormat}
         connection_manager["type"] = "file"
         return {"message": f"Started playback from {file.filename}"}
 

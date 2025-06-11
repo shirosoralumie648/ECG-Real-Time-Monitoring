@@ -17,6 +17,7 @@ const HomePage = () => {
   const [error, setError] = useState(null);
   const [selectedFile, setSelectedFile] = useState(null);
   const [isScanning, setIsScanning] = useState(false);
+  const [dataFormat, setDataFormat] = useState('rawdata'); // Added for data format selection
 
   const handleConnect = async () => {
     setIsConnecting(true);
@@ -49,6 +50,7 @@ const HomePage = () => {
           formData.append('port', udpPort);
           statusMessage = `Connected to UDP ${udpHost}:${udpPort}`;
         }
+        formData.append('dataFormat', dataFormat); // Add data format to form data
         fetchOptions.body = formData;
         // For FormData, browser sets Content-Type automatically
       }
@@ -140,9 +142,9 @@ const HomePage = () => {
   };
 
   useEffect(() => {
+    // Automatically scan for serial ports when the component mounts and 'serial' is the data source
     if (dataSource === 'serial') {
       handleScanPorts();
-      fetchSerialPorts();
     }
   }, [dataSource]);
 
@@ -333,6 +335,25 @@ const HomePage = () => {
             <Button onClick={handleScanPorts} disabled={isConnecting || isConnected || isScanning}>
               {isScanning ? <CircularProgress size={24} /> : 'Scan'}
             </Button>
+          </Box>
+        )}
+
+        {/* Data Format Selection - Common for Serial, UDP, File */}
+        {(dataSource === 'serial' || dataSource === 'udp' || dataSource === 'file') && (
+          <Box sx={{ mt: 2, mb: 2 }}>
+            <FormControl fullWidth>
+              <InputLabel>Data Format</InputLabel>
+              <Select
+                value={dataFormat}
+                label="Data Format"
+                onChange={(e) => setDataFormat(e.target.value)}
+                disabled={isConnecting || isConnected}
+              >
+                <MenuItem value="rawdata">Raw Data</MenuItem>
+                <MenuItem value="justfloat">Just Float</MenuItem>
+                <MenuItem value="firewater">Firewater</MenuItem>
+              </Select>
+            </FormControl>
           </Box>
         )}
 
