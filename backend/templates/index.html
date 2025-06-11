@@ -3,79 +3,377 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>ECG 实时监测系统</title>
+    <title>ECG实时监控系统</title>
     <!-- Bootstrap CSS -->
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+    <!-- Font Awesome -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <!-- Google Fonts -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@300;400;500;600;700&display=swap" rel="stylesheet">
     <!-- Custom CSS -->
     <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
+    <!-- Chart.js -->
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
     <!-- Socket.IO -->
     <script src="https://cdn.socket.io/4.4.1/socket.io.min.js"></script>
-    <!-- Plotly.js -->
-    <script src="https://cdn.plot.ly/plotly-latest.min.js"></script>
+    <style>
+        body {
+            font-family: 'Poppins', sans-serif;
+            background: linear-gradient(135deg, #f5f7fa 0%, #e4e9f2 100%);
+            min-height: 100vh;
+            padding: 2rem 0;
+        }
+        
+        .container {
+            max-width: 1200px;
+            margin: 0 auto;
+        }
+        
+        .header {
+            text-align: center;
+            margin-bottom: 2rem;
+        }
+        
+        .header h1 {
+            color: var(--primary-color);
+            font-weight: 700;
+            margin-bottom: 0.5rem;
+        }
+        
+        .header p {
+            color: var(--gray-color);
+            font-size: 1.1rem;
+        }
+        
+        #ecg-chart {
+            width: 100%;
+            height: 400px;
+            background-color: white;
+            border-radius: var(--border-radius);
+            padding: 1rem;
+            box-shadow: var(--box-shadow);
+        }
+        
+        .btn-group {
+            display: flex;
+            gap: 1rem;
+            margin: 1.5rem 0;
+        }
+        
+        .settings-panel {
+            background-color: rgba(255, 255, 255, 0.5);
+            border-radius: var(--border-radius);
+            padding: 1.5rem;
+            margin-bottom: 1.5rem;
+        }
+        
+        #connection-status, #monitoring-status {
+            display: inline-block;
+            margin-right: 1rem;
+        }
+    </style>
 </head>
 <body>
-
-<nav class="navbar navbar-expand-lg navbar-dark bg-dark">
-    <div class="container-fluid">
-        <a class="navbar-brand" href="#">ECG 监测系统</a>
-    </div>
-</nav>
-
-<div class="container mt-4">
-    <div class="row mb-3 gy-3">
-        <div class="col-md-6">
-            <h5>控制面板</h5>
-            <div class="d-flex flex-wrap gap-2">
-                <button class="btn btn-success" onclick="startECG()">开始实时监测</button>
-                <button class="btn btn-danger" onclick="stopECG()">停止实时监测</button>
-            </div>
+    <div class="container">
+        <div class="header">
+            <h1><i class="fas fa-heartbeat me-2"></i>ECG实时监控系统</h1>
+            <p>实时监测和分析心电图数据</p>
+            <nav aria-label="breadcrumb">
+                <ol class="breadcrumb justify-content-center">
+                    <li class="breadcrumb-item"><a href="{{ url_for('home') }}" class="text-decoration-none">首页</a></li>
+                    <li class="breadcrumb-item active" aria-current="page">ECG监测</li>
+                </ol>
+            </nav>
         </div>
-        <div class="col-md-6">
-            <h5>历史数据分析</h5>
-            <div class="input-group">
-                <select class="form-select" id="ecgFiles">
-                    <option selected>选择一个历史文件...</option>
+        
+        <!-- 连接和监测控制面板 -->
+        <div class="card mb-4">
+            <div class="card-header d-flex justify-content-between align-items-center">
+                <h2><i class="fas fa-plug me-2"></i>连接与监测控制</h2>
+                <div>
+                    <span id="connection-status" class="status-indicator status-disconnected">
+                        <i class="fas fa-unlink me-1"></i>未连接
+                    </span>
+                    
+                    <span id="monitoring-status" class="status-indicator status-inactive">
+                        <i class="fas fa-pause-circle me-1"></i>未监测
+                    </span>
+                </div>
+            </div>
+            
+            <div class="card-body">
+            
+                <!-- 数据源选择 -->
+                <div class="row">
+                    <div class="col-md-6">
+                        <div class="form-group">
+                            <label for="source-type">
+                                <i class="fas fa-database me-2"></i>数据源类型
+                            </label>
+                            <select id="source-type" class="form-select">
+                                <option value="serial">串口</option>
+                                <option value="udp">UDP</option>
+                                <option value="bluetooth">蓝牙</option>
+                                <option value="file">文件</option>
+                            </select>
+                            <div class="help-text">选择数据采集的来源类型</div>
+                        </div>
+                    </div>
+                </div>
+            
+            <!-- 数据源设置 -->
+            <div id="source-settings">
+                <!-- 串口设置 -->
+                <div id="serial-settings" class="settings-panel">
+                    <div class="form-group">
+                        <label for="serial-port">串口</label>
+                        <select id="serial-port"></select>
+                        <button id="scan-ports-btn" class="btn btn-warning" style="width: auto; margin-top: 10px;">扫描串口</button>
+                        <div class="help-text">选择连接的串口设备</div>
+                    </div>
+                    
+                    <div class="form-group">
+                        <label for="serial-baudrate">波特率</label>
+                        <select id="serial-baudrate">
+                            <option value="9600">9600</option>
+                            <option value="19200">19200</option>
+                            <option value="38400">38400</option>
+                            <option value="57600">57600</option>
+                            <option value="115200">115200</option>
+                            <option value="230400">230400</option>
+                            <option value="460800">460800</option>
+                            <option value="921600" selected>921600</option>
+                        </select>
+                        <div class="help-text">选择串口波特率，通常为921600</div>
+                    </div>
+                </div>
+                
+                <!-- UDP设置 -->
+                <div id="udp-settings" class="settings-panel">
+                    <div class="form-group">
+                        <label for="local-ip">本地IP</label>
+                        <input type="text" id="local-ip" value="0.0.0.0">
+                        <div class="help-text">本地监听IP地址，通常为0.0.0.0（所有接口）</div>
+                    </div>
+                    
+                    <div class="form-group">
+                        <label for="local-port">本地端口</label>
+                        <input type="number" id="local-port" value="5001">
+                        <div class="help-text">本地监听端口，默认为5001</div>
+                    </div>
+                    
+                    <div class="form-group">
+                        <label for="remote-ip">远程IP（可选）</label>
+                        <input type="text" id="remote-ip">
+                        <div class="help-text">远程设备IP地址，留空表示接受任何IP</div>
+                    </div>
+                    
+                    <div class="form-group">
+                        <label for="remote-port">远程端口（可选）</label>
+                        <input type="number" id="remote-port">
+                        <div class="help-text">远程设备端口，留空表示接受任何端口</div>
+                    </div>
+                </div>
+                
+                <!-- 蓝牙设置 -->
+                <div id="bluetooth-settings" class="settings-panel">
+                    <div class="form-group">
+                        <label for="bluetooth-device">蓝牙设备</label>
+                        <select id="bluetooth-device"></select>
+                        <button id="scan-bluetooth-btn" class="btn btn-warning" style="width: auto; margin-top: 10px;">扫描蓝牙设备</button>
+                        <div class="help-text">选择连接的蓝牙设备</div>
+                    </div>
+                    
+                    <div class="form-group">
+                        <label for="bluetooth-baudrate">波特率</label>
+                        <select id="bluetooth-baudrate">
+                            <option value="9600">9600</option>
+                            <option value="19200">19200</option>
+                            <option value="38400">38400</option>
+                            <option value="57600">57600</option>
+                            <option value="115200">115200</option>
+                            <option value="230400">230400</option>
+                            <option value="460800">460800</option>
+                            <option value="921600" selected>921600</option>
+                        </select>
+                        <div class="help-text">选择蓝牙设备波特率，通常为921600</div>
+                    </div>
+                </div>
+                
+                <!-- 文件设置 -->
+                <div id="file-settings" class="settings-panel">
+                    <div class="form-group">
+                        <label for="file-name">文件名</label>
+                        <input type="text" id="file-name">
+                        <button id="browse-file-btn" class="btn btn-warning" style="width: auto; margin-top: 10px;">浏览文件</button>
+                        <div class="help-text">选择包含ECG数据的文件</div>
+                    </div>
+                </div>
+            </div>
+            
+                <!-- 连接控制按钮 -->
+                <div class="btn-group mt-4">
+                    <button id="connect-btn" class="btn btn-success">
+                        <i class="fas fa-link me-2"></i>连接
+                    </button>
+                    <button id="disconnect-btn" class="btn btn-danger" disabled>
+                        <i class="fas fa-unlink me-2"></i>断开连接
+                    </button>
+                </div>
+            
+            <!-- 监测设置 -->
+            <div class="form-group" style="margin-top: 20px;">
+                <label for="patient-select">患者</label>
+                <select id="patient-select">
+                    <option value="">-- 选择患者 --</option>
                 </select>
-                <button class="btn btn-outline-secondary dropdown-toggle" type="button" data-bs-toggle="dropdown" aria-expanded="false">选择分析</button>
-                <ul class="dropdown-menu dropdown-menu-end">
-                  <li><a class="dropdown-item" href="#" onclick="triggerAnalysis(); return false;">ECG特征</a></li>
-                  <li><a class="dropdown-item" href="#" onclick="HRVAnalysis(); return false;">HRV分析</a></li>
-                  <li><a class="dropdown-item" href="#" onclick="EDRAnalysis(); return false;">ECG衍生呼吸</a></li>
-                </ul>
+                <div class="help-text">选择要监测的患者（可选）</div>
+            </div>
+            
+            <div class="form-group">
+                <label for="playback-speed">回放速度</label>
+                <input type="number" id="playback-speed" value="1.0" min="0.1" max="10" step="0.1">
+                <div class="help-text">设置数据回放速度（仅适用于文件数据源）</div>
+            </div>
+            
+                <!-- 监测控制按钮 -->
+                <div class="btn-group mt-4">
+                    <button id="start-btn" class="btn btn-primary" disabled>
+                        <i class="fas fa-play me-2"></i>开始监测
+                    </button>
+                    <button id="stop-btn" class="btn btn-warning" disabled>
+                        <i class="fas fa-stop me-2"></i>停止监测
+                    </button>
+                </div>
             </div>
         </div>
-    </div>
-
-    <div class="card mb-4">
-        <div class="card-header">
-            实时 ECG 信号 (12 导联)
-        </div>
-        <div class="card-body">
-            <div id="ecg_plots" class="plotly-chart-container"></div>
-        </div>
-    </div>
-
-    <div class="card">
-        <div class="card-header">
-            分析结果
-        </div>
-        <div class="card-body">
-            <div id="analysis_results" class="text-center">请先选择历史文件并点击分析按钮</div>
-            <div id="result" class="text-center mt-3">
-                <img id="ecgImage" src="" alt="分析图像" class="img-fluid" style="display: none; max-width: 100%; height: auto;"/>
+        
+        <!-- ECG图表面板 -->
+        <div class="card">
+            <div class="card-header d-flex justify-content-between align-items-center">
+                <h2><i class="fas fa-chart-line me-2"></i>ECG实时数据</h2>
+                <div class="chart-controls">
+                    <button class="btn btn-sm btn-outline-primary" id="zoom-in-btn">
+                        <i class="fas fa-search-plus"></i>
+                    </button>
+                    <button class="btn btn-sm btn-outline-primary" id="zoom-out-btn">
+                        <i class="fas fa-search-minus"></i>
+                    </button>
+                    <button class="btn btn-sm btn-outline-primary" id="reset-zoom-btn">
+                        <i class="fas fa-redo"></i>
+                    </button>
+                </div>
+            </div>
+            
+            <div class="card-body">
+            
+                <!-- 导联选择器 -->
+                <div class="lead-selector mb-4">
+                    <div class="lead-group">
+                        <span class="lead-group-label">标准导联</span>
+                        <button class="lead-btn active" data-lead="0">I</button>
+                        <button class="lead-btn" data-lead="1">II</button>
+                        <button class="lead-btn" data-lead="2">III</button>
+                    </div>
+                    
+                    <div class="lead-group">
+                        <span class="lead-group-label">增强导联</span>
+                        <button class="lead-btn" data-lead="3">aVR</button>
+                        <button class="lead-btn" data-lead="4">aVL</button>
+                        <button class="lead-btn" data-lead="5">aVF</button>
+                    </div>
+                    
+                    <div class="lead-group">
+                        <span class="lead-group-label">胸导联</span>
+                        <button class="lead-btn" data-lead="6">V1</button>
+                        <button class="lead-btn" data-lead="7">V2</button>
+                        <button class="lead-btn" data-lead="8">V3</button>
+                        <button class="lead-btn" data-lead="9">V4</button>
+                        <button class="lead-btn" data-lead="10">V5</button>
+                        <button class="lead-btn" data-lead="11">V6</button>
+                    </div>
+                </div>
+            
+                <!-- ECG图表 -->
+                <div class="chart-container">
+                    <canvas id="ecg-chart"></canvas>
+                </div>
+                
+                <!-- 心率信息 -->
+                <div class="vital-signs-container mt-3">
+                    <div class="vital-sign">
+                        <span class="vital-label">心率</span>
+                        <span class="vital-value" id="heart-rate">-- <small>BPM</small></span>
+                    </div>
+                    <div class="vital-sign">
+                        <span class="vital-label">RR间期</span>
+                        <span class="vital-value" id="rr-interval">-- <small>ms</small></span>
+                    </div>
+                    <div class="vital-sign">
+                        <span class="vital-label">QT间期</span>
+                        <span class="vital-value" id="qt-interval">-- <small>ms</small></span>
+                    </div>
+                </div>
             </div>
         </div>
+        
+        <!-- 通知区域 -->
+        <div id="notification-area" class="notification-area"></div>
+        
+        <!-- 页脚 -->
+        <footer class="mt-5 py-3 text-center">
+            <div class="container">
+                <p class="small">&copy; 2025 生理信号实时监测系统 | <a href="{{ url_for('home') }}" class="text-decoration-none">返回首页</a></p>
+            </div>
+        </footer>
     </div>
-
-</div>
-
-<footer class="text-center mt-4 py-3 bg-light">
-    <p>&copy; 2025 ECG 监测系统</p>
-</footer>
-
-<!-- Bootstrap JS Bundle -->
-<script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
-<!-- Custom JS -->
-<script src="{{ url_for('static', filename='ecg.js') }}"></script>
+    
+    <!-- Bootstrap JS Bundle -->
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+    
+    <!-- 加载脚本 -->
+    <script src="{{ url_for('static', filename='js/monitor.js') }}"></script>
+    <script src="{{ url_for('static', filename='js/ecg-chart.js') }}"></script>
+    
+    <script>
+        // 图表缩放控制
+        document.getElementById('zoom-in-btn').addEventListener('click', function() {
+            if (ecgChart && ecgChart.options.scales.y) {
+                const currentMin = ecgChart.options.scales.y.min || -2;
+                const currentMax = ecgChart.options.scales.y.max || 2;
+                const range = currentMax - currentMin;
+                const newRange = range * 0.8;
+                const center = (currentMax + currentMin) / 2;
+                
+                ecgChart.options.scales.y.min = center - newRange / 2;
+                ecgChart.options.scales.y.max = center + newRange / 2;
+                ecgChart.update();
+            }
+        });
+        
+        document.getElementById('zoom-out-btn').addEventListener('click', function() {
+            if (ecgChart && ecgChart.options.scales.y) {
+                const currentMin = ecgChart.options.scales.y.min || -2;
+                const currentMax = ecgChart.options.scales.y.max || 2;
+                const range = currentMax - currentMin;
+                const newRange = range * 1.2;
+                const center = (currentMax + currentMin) / 2;
+                
+                ecgChart.options.scales.y.min = center - newRange / 2;
+                ecgChart.options.scales.y.max = center + newRange / 2;
+                ecgChart.update();
+            }
+        });
+        
+        document.getElementById('reset-zoom-btn').addEventListener('click', function() {
+            if (ecgChart && ecgChart.options.scales.y) {
+                ecgChart.options.scales.y.min = -2;
+                ecgChart.options.scales.y.max = 2;
+                ecgChart.update();
+            }
+        });
+    </script>
 </body>
 </html>

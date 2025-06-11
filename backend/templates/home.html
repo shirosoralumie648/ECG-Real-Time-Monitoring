@@ -1,0 +1,149 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>生理信号实时监测系统</title>
+    <!-- Bootstrap CSS -->
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+    <!-- Font Awesome -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <!-- Animate.css -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/animate.css/4.1.1/animate.min.css">
+    <!-- Google Fonts -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+    <!-- Custom CSS -->
+    <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
+    <style>
+        body {
+            font-family: 'Poppins', sans-serif;
+        }
+        .animate-on-scroll {
+            opacity: 0;
+            transform: translateY(20px);
+            transition: opacity 0.6s ease, transform 0.6s ease;
+        }
+        .animate-on-scroll.visible {
+            opacity: 1;
+            transform: translateY(0);
+        }
+    </style>
+</head>
+<body class="home-page">
+    <div class="home-container">
+        <div class="home-content text-center">
+            <h1 class="display-4 mb-4 fw-bold animate__animated animate__fadeInDown">
+                <span class="text-primary">生理信号</span>实时监测系统
+            </h1>
+            
+            <div class="row justify-content-center">
+                <div class="col-lg-8 col-md-10">
+                    <p class="lead mb-5 animate__animated animate__fadeIn animate__delay-1s">
+                        欢迎使用生理信号实时监测系统，高精度采集与分析平台
+                        <br>请选择您需要的监测类型开始使用
+                    </p>
+                    
+                    <div class="row g-4 justify-content-center">
+                        <!-- ECG监测卡片 -->
+                        <div class="col-md-6 col-lg-5 animate-on-scroll">
+                            <div class="card home-card h-100">
+                                <div class="card-body text-center py-5">
+                                    <div class="icon-container mb-4">
+                                        <i class="fas fa-heartbeat fa-4x text-danger"></i>
+                                    </div>
+                                    <h3 class="card-title mb-3">ECG实时监测</h3>
+                                    <p class="card-text mb-4">心电图信号实时采集、显示与分析，支持多导联数据监测和异常检测</p>
+                                    <div class="features-list mb-4 text-start">
+                                        <div class="feature-item"><i class="fas fa-check-circle text-success me-2"></i>多种数据源支持</div>
+                                        <div class="feature-item"><i class="fas fa-check-circle text-success me-2"></i>实时波形显示</div>
+                                        <div class="feature-item"><i class="fas fa-check-circle text-success me-2"></i>心率变异性分析</div>
+                                    </div>
+                                    <a href="{{ url_for('ecg') }}" class="btn btn-primary btn-lg mt-3 w-100">
+                                        <i class="fas fa-arrow-right me-2"></i>进入系统
+                                    </a>
+                                </div>
+                            </div>
+                        </div>
+                        
+                        <!-- 呼吸监测卡片 -->
+                        <div class="col-md-6 col-lg-5 animate-on-scroll">
+                            <div class="card home-card h-100">
+                                <div class="card-body text-center py-5">
+                                    <div class="icon-container mb-4">
+                                        <i class="fas fa-lungs fa-4x text-info"></i>
+                                    </div>
+                                    <h3 class="card-title mb-3">呼吸实时监测</h3>
+                                    <p class="card-text mb-4">呼吸信号实时采集、显示与分析，支持呼吸频率检测和呼吸暂停识别</p>
+                                    <div class="features-list mb-4 text-start">
+                                        <div class="feature-item"><i class="fas fa-check-circle text-success me-2"></i>呼吸频率监测</div>
+                                        <div class="feature-item"><i class="fas fa-check-circle text-success me-2"></i>呼吸模式分析</div>
+                                        <div class="feature-item"><i class="fas fa-check-circle text-success me-2"></i>异常事件报警</div>
+                                    </div>
+                                    <a href="{{ url_for('respiration') }}" class="btn btn-info btn-lg mt-3 text-white w-100">
+                                        <i class="fas fa-arrow-right me-2"></i>进入系统
+                                    </a>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+        
+        <footer class="text-center mt-5 py-3">
+            <div class="container">
+                <div class="row">
+                    <div class="col-md-4 text-md-start mb-3 mb-md-0">
+                        <h5 class="mb-3 text-primary">生理信号实时监测系统</h5>
+                        <p class="small">高精度生理信号采集与分析平台</p>
+                    </div>
+                    <div class="col-md-4 mb-3 mb-md-0">
+                        <h5 class="mb-3">快速链接</h5>
+                        <ul class="list-unstyled">
+                            <li><a href="{{ url_for('ecg') }}" class="text-decoration-none">ECG监测</a></li>
+                            <li><a href="{{ url_for('respiration') }}" class="text-decoration-none">呼吸监测</a></li>
+                        </ul>
+                    </div>
+                    <div class="col-md-4 text-md-end">
+                        <h5 class="mb-3">联系我们</h5>
+                        <p class="small">技术支持: support@ecg-monitor.com</p>
+                    </div>
+                </div>
+                <hr>
+                <p class="small">&copy; 2025 生理信号实时监测系统 | 版本 1.0</p>
+            </div>
+        </footer>
+    </div>
+
+    <!-- Bootstrap JS Bundle -->
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+    
+    <!-- Animation Script -->
+    <script>
+        // 页面加载完成后执行
+        document.addEventListener('DOMContentLoaded', function() {
+            // 获取所有需要动画的元素
+            const animateElements = document.querySelectorAll('.animate-on-scroll');
+            
+            // 初始显示已在视口中的元素
+            checkVisibility();
+            
+            // 监听滚动事件
+            window.addEventListener('scroll', checkVisibility);
+            
+            function checkVisibility() {
+                animateElements.forEach(element => {
+                    const elementTop = element.getBoundingClientRect().top;
+                    const elementVisible = 150; // 元素距离视口顶部的距离小于这个值时显示
+                    
+                    if (elementTop < window.innerHeight - elementVisible) {
+                        element.classList.add('visible');
+                    }
+                });
+            }
+        });
+    </script>
+</body>
+</html>
