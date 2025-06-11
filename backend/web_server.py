@@ -2,6 +2,13 @@
 
 # 确保在所有导入之前执行monkey_patch
 import eventlet
+import numpy as np
+from matplotlib import pyplot as plt
+
+
+from .ecg_data_processor import ECGDataProcessor
+from .ecg_signal_analyzer import ECGSignalAnalyzer
+
 eventlet.monkey_patch()
 
 # 导入其他模块
@@ -9,87 +16,20 @@ import numpy as np
 import matplotlib.pyplot as plt
 import os
 import io
-import time
-import json
-from datetime import datetime
+import neurokit2 as nk
 
-# 导入Flask相关库
-from flask import Flask, render_template, request, jsonify, send_file, redirect, url_for, session
-from flask_socketio import SocketIO, emit
-from flask_login import LoginManager, login_required, current_user, login_user, logout_user
-from flask_bcrypt import Bcrypt
-from flask_cors import CORS
 
-# 导入微服务组件
-from .services.user_service import user_service, User
-from .services.patient_service import patient_service
-from .services.device_service import device_service
-from .services.data_acquisition_service import data_acquisition_service
-from .services.data_processing_service import data_processing_service
-from .services.storage_service import storage_service
-from .services.report_service import report_service
-from .services.analysis_service import ecg_analysis_service
+app = Flask(__name__)
+app.config['SECRET_KEY'] = 'secret!'
+socketio = SocketIO(app, cors_allowed_origins='*', async_mode='eventlet', ping_timeout=20, ping_interval=10)
 
-# 导入API路由
-from .api.device_routes import device_bp
-from .api.auth_routes import auth_bp
-from .api.patient_routes import patient_bp
-from .api.report_routes import report_bp
-from .api.analysis_routes import analysis_bp
 
-# 初始化报警服务
-from .services.alert_service import init_alert_service, get_alert_service
+from .ecg_monitoring_system import ECGMonitoringSystem
 
-# 创建Flask应用
-app = Flask(__name__, 
-static_folder='static', template_folder='templates')
-app.config['SECRET_KEY'] = os.environ.get('SECRET_KEY', 'default_secret_key_for_development')
-app.config['SESSION_TYPE'] = 'filesystem'
-app.config['PERMANENT_SESSION_LIFETIME'] = 86400  # 会话有效期（秒）
+ecg_system = ECGMonitoringSystem(socketio)
 
-# 初始化扩展
-bcrypt = Bcrypt(app)
-login_manager = LoginManager(app)
-login_manager.login_view = 'login'  # 未登录时重定向到登录页面
-login_manager.login_message = '请先登录'
-CORS(app)  # 启用跨域支持
 
-# 优化Socket.IO配置以减少延迟并提高性能
-socketio = SocketIO(
-    app, 
-    cors_allowed_origins='*', 
-    async_mode='eventlet', 
-    ping_timeout=10,           # 降低 ping 超时时间以更快地检测连接丢失
-    ping_interval=5,           # 降低 ping 间隔以保持连接活跃
-    max_http_buffer_size=5*1024*1024,  # 增加HTTP缓冲区大小以处理更大的数据包
-    manage_session=False,      # 禁用会话管理以提高性能
-    engineio_logger=False,     # 禁用引擎日志以提高性能
-    logger=False               # 禁用日志以提高性能
-)
-
-# 初始化报警服务，传入socketio实例用于实时通知
-alert_service = init_alert_service(socketio)
-
-# 用户加载函数
-@login_manager.user_loader
-def load_user(user_id):
-    return user_service.get_user_by_id(user_id)
-
-# 注册API蓝图
-app.register_blueprint(device_bp, url_prefix='/api/device')
-app.register_blueprint(auth_bp, url_prefix='/api/auth')
-app.register_blueprint(patient_bp, url_prefix='/api/patient')
-app.register_blueprint(report_bp, url_prefix='/api/report')
-app.register_blueprint(analysis_bp)
-
-# 设置数据存储目录
-BASE_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
-DATA_DIR = os.path.join(BASE_DIR, 'data')
-REPORT_DIR = os.path.join(DATA_DIR, 'reports')
-
-# 确保目录存在
-os.makedirs(DATA_DIR, exist_ok=True)
-os.makedirs(REPORT_DIR, exist_ok=True)
+FILE_DIRECTORY = '.'
 
 
 @app.route('/process_edr', methods=['POST'])
@@ -277,26 +217,15 @@ def disconnect():
 @app.route('/start', methods=['POST'])
 def start():
     print("Received /start request")
-    
-    try:
-        # 获取回放速度（如果是文件模式）
-        source_config = request.get_json() or {}
-        speed = source_config.get('speed', 1.0)
-        
-        # 开始监测
-        if ecg_system.start_monitoring(speed):
-            return jsonify({'status': 'started'}), 200
-        else:
-            return jsonify({'status': 'error', 'message': '启动监测失败'}), 500
-    
-    except Exception as e:
-        print(f"Error starting ECG system: {e}")
-        return jsonify({'status': 'error', 'message': str(e)}), 500
+    ecg_system.start()
+    return jsonify({'status': 'started'}), 200
 
 @app.route('/stop', methods=['POST'])
 def stop():
     print("Received /stop request")
     ecg_system.stop()
+    # 同时停止呼吸监测系统
+    respiration_system.stop()
     return jsonify({'status': 'stopped'})
 
 @app.route('/analyze', methods=['POST'])
@@ -315,6 +244,10 @@ def analyze():
     elif analysis_type == 'clinical_indices':
         clinical_indices = ecg_system.data_processor.calculate_clinical_indices(ecg_signal)
         result = generate_clinical_indices_result(clinical_indices)
+    elif analysis_type == 'respiration_rate':  # 添加呼吸频率分析
+        respiration_signal = respiration_system.accumulated_data
+        respiration_rate = respiration_processor.calculate_respiration_rate(respiration_signal)
+        result = str(respiration_rate)
     else:
         result = '未知的分析类型'
     return jsonify({'result': result})
