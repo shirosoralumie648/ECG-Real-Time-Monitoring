@@ -1,76 +1,98 @@
-from fastapi import APIRouter, WebSocket, WebSocketDisconnect
-import json
 import asyncio
-from typing import List
+import logging
+import json
+import time
+from fastapi import APIRouter, WebSocket, WebSocketDisconnect
+from websocket_manager import websocket_manager
 
+logger = logging.getLogger(__name__)
 router = APIRouter()
 
-class ConnectionManager:
-    def __init__(self):
-        self.clients: List[WebSocket] = []
-        self.data_source: WebSocket | None = None
-
-    async def connect(self, websocket: WebSocket):
-        await websocket.accept()
-
-    def disconnect(self, websocket: WebSocket):
-        if websocket in self.clients:
-            self.clients.remove(websocket)
-            print(f"Client disconnected. Total clients: {len(self.clients)}")
-        if self.data_source == websocket:
-            self.data_source = None
-            print("Data source disconnected.")
-
-    async def broadcast_to_clients(self, message: str):
-        if self.clients:
-            tasks = [client.send_text(message) for client in self.clients]
-            await asyncio.gather(*tasks, return_exceptions=True)
-
-manager = ConnectionManager()
+print("--- Initializing websocket_router in websocket.py ---")
 
 @router.websocket("/ws")
 async def websocket_endpoint(websocket: WebSocket):
-    await manager.connect(websocket)
+    print("--- WebSocket connection attempt received at /ws endpoint ---")
+    await websocket.accept()
+    
     try:
-        # Wait for an identification message for a short period.
+        # 等待身份识别消息
         first_message = await asyncio.wait_for(websocket.receive_text(), timeout=1.0)
         message_data = json.loads(first_message)
-
+        
         if message_data.get("type") == "data_source":
-            # This is the data source connection
-            if manager.data_source is not None:
-                print("A data source is already connected. Rejecting new connection.")
-                await websocket.close(code=1008, reason="Data source already connected")
+            # 这是一个数据源连接
+            if websocket_manager.data_source:
+                logger.warning("A data source is already connected. Rejecting new connection.")
+                await websocket.close(code=1008, reason="Data source already exists")
                 return
-
-            manager.data_source = websocket
-            print("Data source connected.")
+                
+            # 设置数据源
+            websocket_manager.set_data_source(websocket)
+            
+            # 处理来自数据源的消息
             try:
-                # Loop to receive data from the source and broadcast it
+                # 限制帧率相关变量
+                last_broadcast_time = time.time()
+                target_interval = 1.0 / 250  # 限制帧率为250fps，匹配ECG常用采样率
+                data_buffer = None
+                
                 while True:
+                    # 持续接收数据
                     data = await websocket.receive_text()
-                    await manager.broadcast_to_clients(data)
-            finally:
-                manager.disconnect(websocket)
+                    data_json = json.loads(data)
+                    
+                    # 将样本加入批量缓冲
+                    if data_buffer is None:
+                        data_buffer = []
+                    data_buffer.append(data_json)
+                    
+                    # 检查是否到达发送间隔
+                    current_time = time.time()
+                    if current_time - last_broadcast_time >= target_interval:
+                        # 达到间隔时批量推送并清空缓冲
+                        if data_buffer:
+                            await websocket_manager.broadcast_data({"batch": data_buffer})
+                            logger.debug(f"批量发送{len(data_buffer)}点，间隔: {current_time - last_broadcast_time:.4f}秒")
+                            data_buffer = []
+                            last_broadcast_time = current_time
+                    else:
+                        # 不发送数据，等待下一次循环
+                        await asyncio.sleep(0.001)  # 小的延迟，避免 CPU 超负载
+            except WebSocketDisconnect:
+                websocket_manager.clear_data_source()
         else:
-            # Message received, but not a valid data_source identifier
-            await websocket.close(code=1002, reason="Invalid identification message")
-
+            # 这是客户端连接
+            await websocket_manager.connect_client(websocket)
+            
+            # 等待客户端断开连接
+            try:
+                await websocket.receive_text()  # 这只是等待消息以检测断开连接
+            except WebSocketDisconnect:
+                await websocket_manager.disconnect_client(websocket)
+    
     except asyncio.TimeoutError:
-        # No message received within timeout, so it's a client.
-        manager.clients.append(websocket)
-        print(f"Client connected. Total clients: {len(manager.clients)}")
+        # 如果没有收到身份消息，假定这是客户端
+        logger.info("No identification message received, treating as a client connection")
+        await websocket_manager.connect_client(websocket)
+        
+        # 等待客户端断开连接
         try:
-            # Keep the connection open to receive broadcasts. The loop will exit on disconnect.
-            while True:
-                await websocket.receive_text() # This just waits for a message to detect disconnect
-        finally:
-            manager.disconnect(websocket)
-
-    except (json.JSONDecodeError, WebSocketDisconnect):
-        # Disconnect if the first message isn't valid JSON or if a disconnect occurs.
-        manager.disconnect(websocket)
+            await websocket.receive_text()
+        except WebSocketDisconnect:
+            await websocket_manager.disconnect_client(websocket)
+    
+    except WebSocketDisconnect:
+        # 连接过程中断开
+        if websocket_manager.is_data_source(websocket):
+            websocket_manager.clear_data_source()
+        else:
+            await websocket_manager.disconnect_client(websocket)
+    
     except Exception as e:
-        print(f"An unexpected error occurred: {e}")
-        manager.disconnect(websocket)
-
+        # 其他异常处理
+        logger.error(f"Error in websocket handler: {e}")
+        try:
+            await websocket.close(code=1011, reason="Server error")
+        except:
+            pass
